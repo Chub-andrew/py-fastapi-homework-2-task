@@ -138,3 +138,7 @@ def remove_film(film_id: int, db: Session = Depends(get_db)):
     db_film = db.query(MovieModel).filter(MovieModel.id == film_id).first()
     if not db_film:
         raise HTTPException(status_code=404, detail="Movie with the given ID was not found.")
+
+    db.delete(db_film)
+    db.commit()
+    return None
