@@ -1,137 +1,109 @@
-from typing import List, Optional, ClassVar
+from datetime import date, timedelta
+from enum import Enum
+from typing import List, Optional
 
-from pydantic import BaseModel, ConfigDict, Field
-from sqlalchemy import Column, Integer, String, ForeignKey
-from sqlalchemy.orm import relationship
-from sqlalchemy.ext.declarative import declarative_base
-from datetime import datetime, date
+from pydantic import BaseModel, Field, field_validator, ConfigDict
 
 
+class MovieStatus(str, Enum):
+    released = "Released"
+    post_production = "Post Production"
+    in_production = "In Production"
 
-# Base = declarative_base()
 
-class CountryBase(BaseModel):
+class CountrySchema(BaseModel):
     id: int
     code: str
-    name: str
+    name: str | None
 
-    # schema_extra = {
-    #     "example": {
-    #         "id": 1,
-    #         "code": "US",
-    #         "name": "United States"
-    #     }
-    # }
+    model_config = ConfigDict(from_attributes=True)
 
-    model_config: ClassVar[dict] = {
-        "json_schema_extra": {
-            "example": {
-                "id": 1,
-                "code": "US",
-                "name": "United States"
-            }
-        }
-    }
 
-class GenreBase(BaseModel):
+class GenreSchema(BaseModel):
     id: int
     name: str
 
     model_config = ConfigDict(from_attributes=True)
 
 
-class ActorBase(BaseModel):
-    id: int
-    name: str
-
-    model_config = ConfigDict(from_attributes=True)
-
-class LanguageBase(BaseModel):
+class ActorSchema(BaseModel):
     id: int
     name: str
 
     model_config = ConfigDict(from_attributes=True)
 
 
-# class MovieModel(Base):
-#     __tablename__ = "movies"
-#
-#     id = Column(Integer, primary_key=True)
-#     name = Column(String)
-#     country_id = Column(Integer, ForeignKey("countries.id"), nullable=False)
-#     country = relationship("CountryModel", back_populates="movies")
-
-class MovieBase(BaseModel):
+class LanguageSchema(BaseModel):
     id: int
     name: str
-    date: str
-    score: float
-    overview: str
-    status: str
-    budget: float
-    revenue: float
-    country: CountryBase
-    genres: List[GenreBase]
-    actors: List[ActorBase]
-    languages: List[LanguageBase]
 
     model_config = ConfigDict(from_attributes=True)
 
 
-class MovieResponse(BaseModel):
-    id: int
-    name: str
+class MovieCreateSchema(BaseModel):
+    name: str = Field(max_length=255)
     date: date
-    score: Optional[float] = None
-    overview: Optional[str] = None
-
-    model_config = ConfigDict(from_attributes=True)
-
-
-class MovieCreate(BaseModel):
-    name: str
-    date: date
-    score: float
+    score: float = Field(ge=0, le=100)
     overview: str
-    status: str
-    budget: float
-    revenue: float
-    country: str
+    status: MovieStatus
+    budget: float = Field(ge=0)
+    revenue: float = Field(ge=0)
+    country: str = Field(min_length=2, max_length=3)
     genres: List[str]
     actors: List[str]
     languages: List[str]
 
+    @field_validator("date")
+    @classmethod
+    def validate_date(cls, value: date) -> date:
+        today = date.today()
+        if value > today + timedelta(days=365):
+            raise ValueError(
+                "Release date must not be more than one year in the future."
+            )
+        return value
 
-class MovieListItemResponse(BaseModel):
+
+class MovieDetailSchema(BaseModel):
     id: int
     name: str
-    date: str
-    score: Optional[float] = None
-    overview: Optional[str] = None
+    date: date
+    score: float
+    overview: str
+    status: MovieStatus
+    budget: float
+    revenue: float
+    country: CountrySchema
+    genres: List[GenreSchema]
+    actors: List[ActorSchema]
+    languages: List[LanguageSchema]
 
     model_config = ConfigDict(from_attributes=True)
 
 
-class PaginationResponse(BaseModel):
-    movies: List[MovieListItemResponse]
-    prev_page: Optional[str] = None
-    next_page: Optional[str] = None
+class MovieListItemSchema(BaseModel):
+    id: int
+    name: str
+    date: date
+    score: float
+    overview: str
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class MovieListResponseSchema(BaseModel):
+    movies: list[MovieListItemSchema]
+    prev_page: str | None = None
+    next_page: str | None = None
     total_pages: int
     total_items: int
 
 
-class CountryResponse(BaseModel):
-    id: int
-    name: str = Field(..., example="USA")
-    code: str = Field(..., example="US")
-
-class MovieDetailResponse(BaseModel):
-    id: int
-    name: str
-    date: str
-    score: float
-    overview: str
-    status: str
-    budget: float
-    revenue: float
-    country: CountryResponse
+class MoviePatchSchema(BaseModel):
+    name: Optional[str] = Field(default=None, max_length=255)
+    date: Optional[date] = None
+    score: Optional[float] = Field(default=None, ge=0, le=100)
+    overview: Optional[str] = None
+    status: Optional[MovieStatus] = None
+    budget: Optional[float] = Field(default=None, ge=0)
+    revenue: Optional[float] = Field(default=None, ge=0)
